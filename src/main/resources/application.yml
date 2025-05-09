@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/flexit_user_database
+    username: postgres
+    password: hrhk@9090
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      poolname: flexit-service-pool
+      maximum_pool_size: 10
+      minimum_idle: 1
+      idle_timeout: 60000
+      max_lifetime : 300000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+  application:
+    name: flexit-auth-backend
+
+server:
+  port: 8091

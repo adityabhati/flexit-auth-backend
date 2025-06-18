@@ -29,7 +29,6 @@ public class User {
     private String email;
     @Column(unique = true, nullable = false)
     private String phoneNumber;
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(nullable = false)
     private String password;
     @OneToMany(mappedBy = "user", cascade = CascadeType.PERSIST, orphanRemoval = true, fetch = FetchType.LAZY)

@@ -2,6 +2,7 @@ package com.flexit.user_management.controller;
 
 import com.flexit.user_management.dto.AuthDtoResponse;
 import com.flexit.user_management.dto.UserDto;
+import com.flexit.user_management.dto.UserUpdateDto;
 import com.flexit.user_management.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,23 @@ public class UserController {
     @GetMapping("/token")
     public ResponseEntity<AuthDtoResponse> loginByRefreshToken(@RequestParam String refreshToken) {
         return ResponseEntity.ok().body(userService.validateUserByToken(refreshToken));
+    }
+
+    @GetMapping("/logout")
+    public ResponseEntity<String> logout(@RequestParam Long userId) {
+        userService.logoutUser(userId);
+        return ResponseEntity.ok().body("User Logged out successfully");
+    }
+
+    @GetMapping("/user-info")
+    public ResponseEntity<UserDto> getUserById(@RequestParam String username) {
+        return ResponseEntity.ok().body(userService.getUserByUsername(username));
+    }
+
+    @PutMapping("/update-user")
+    public ResponseEntity<String> updateUserByUsername(@RequestBody UserUpdateDto userDto, @RequestParam String username) {
+        userService.updateUser(userDto, username);
+        return ResponseEntity.ok().body("User updated successfully");
     }
 
 }

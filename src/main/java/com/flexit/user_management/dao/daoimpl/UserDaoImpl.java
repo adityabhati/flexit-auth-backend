@@ -14,9 +14,8 @@ public class UserDaoImpl implements UserDao {
     private final UserRepo userRepo;
 
     @Override
-    public User save(User user) {
+    public void save(User user) {
         userRepo.save(user);
-        return user;
     }
 
     @Override

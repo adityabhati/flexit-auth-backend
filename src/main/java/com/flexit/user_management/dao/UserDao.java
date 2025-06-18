@@ -5,7 +5,7 @@ import com.flexit.user_management.model.User;
 import java.util.Optional;
 
 public interface UserDao {
-    User save(User user);
+    void save(User user);
 
     User findByUsername(String username);
 

@@ -22,12 +22,13 @@ public class JwtUtil {
         this.secretKey = Keys.hmacShaKeyFor(iniConfiguration.getString(IniConstant.USER_PASS_ENCRYPTION_KEY).getBytes());
     }
 
-    public String generateToken(String username, Long validity) {
+    public String generateToken(String username, String role, Long validity) {
         Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, username, validity);
+        return createToken(claims, username, role, validity);
     }
 
-    private String createToken(Map<String, Object> claims, String email, Long validity) {
+    private String createToken(Map<String, Object> claims, String email, String role, Long validity) {
+        claims.put("role", role);
         return Jwts.builder()
                 .claims(claims)
                 .subject(email)
@@ -39,10 +40,10 @@ public class JwtUtil {
 
     public boolean validateToken(String token, String username) {
         final String extractedUsername = extractUsername(token);
-        return (extractedUsername.equals(username) && !isTokenExpired(token));
+        return (extractedUsername.equals(username) && !isRefreshTokenExpired(token));
     }
 
-    private boolean isTokenExpired(String token) {
+    private boolean isRefreshTokenExpired(String token) {
         return extractAllClaims(token).getExpiration().before(new Date());
     }
 
@@ -58,7 +59,7 @@ public class JwtUtil {
                 .getPayload();
     }
 
-    public boolean isTokenExpired(Long expiryDate) {
+    public boolean isRefreshTokenExpired(Long expiryDate) {
         return expiryDate <= Instant.now().toEpochMilli();
     }
 }

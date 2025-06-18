@@ -8,5 +8,7 @@ public interface RefreshTokenService {
 
     RefreshTokenDto findByRefreshToken(String refreshToken);
 
-    RefreshTokenDto updateInsertRefreshToken(Long userId, String refreshToken, Long expiryDate);
+    void updateInsertRefreshToken(Long userId, String refreshToken, Long expiryDate);
+
+    void deleteRefreshTokenByUserid(Long userId);
 }

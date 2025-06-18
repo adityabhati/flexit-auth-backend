@@ -27,4 +27,9 @@ public class RefreshTokenDaoImpl implements RefreshTokenDao {
     public RefreshToken updateInsertRefreshToken(Long userId, String refreshToken, Long expiryDate) {
         return refreshTokenRepo.updateInsertRefreshToken(userId, refreshToken, expiryDate);
     }
+
+    @Override
+    public void deleteRefreshTokenByUserId(Long userId) {
+        refreshTokenRepo.deleteByUserId(userId);
+    }
 }

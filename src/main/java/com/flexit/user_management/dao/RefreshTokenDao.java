@@ -8,4 +8,6 @@ public interface RefreshTokenDao {
     RefreshToken findByRefreshToken(String refreshToken);
 
     RefreshToken updateInsertRefreshToken(Long userId, String refreshToken, Long expiryDate);
+
+    void deleteRefreshTokenByUserId(Long userId);
 }

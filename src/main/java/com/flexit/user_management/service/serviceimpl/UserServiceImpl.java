@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flexit.user_management.components.JwtUtil;
 import com.flexit.user_management.dao.RoleDao;
 import com.flexit.user_management.dao.UserDao;
-import com.flexit.user_management.dto.AuthDtoResponse;
-import com.flexit.user_management.dto.RefreshTokenDto;
-import com.flexit.user_management.dto.RoleDto;
-import com.flexit.user_management.dto.UserDto;
+import com.flexit.user_management.dto.*;
 import com.flexit.user_management.exception.FlexitCustomException;
 import com.flexit.user_management.model.Address;
 import com.flexit.user_management.model.RefreshToken;
@@ -44,23 +41,24 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public AuthDtoResponse save(UserDto userDto) {
-        RoleDto role;
+        RoleDto roleDto;
         RefreshToken token = null;
         String refreshToken = "";
         Long accessTokenValidity = iniConfiguration.getLong(IniConstant.ACCESS_TOKEN_VALIDITY);
         long refreshTokenValidity = iniConfiguration.getLong(IniConstant.REFRESH_TOKEN_VALIDITY);
-        String accessToken = jwtUtil.generateToken(userDto.getUsername(), accessTokenValidity);
         String encodedPassword = passwordEncoder.encode(userDto.getPassword());
         userDto.setPassword(encodedPassword);
         if (userDto.getRole() != null) {
-            role = setUserRole(userDto.getId());
+            roleDto = setUserRole(userDto.getRole().getId());
         } else {
-            role = setUserRole(102L);
+            roleDto = setUserRole(102L);
         }
-        userDto.setRole(role);
+        String role = String.valueOf(roleDto.getName());
+        String accessToken = jwtUtil.generateToken(userDto.getUsername(), role, accessTokenValidity);
+        userDto.setRole(roleDto);
         User user = objectMapper.convertValue(userDto, User.class);
         if (user.getUsername() != null) {
-            token = setRefreshToken(user.getUsername(), refreshTokenValidity);
+            token = setRefreshToken(user.getUsername(), role, refreshTokenValidity);
             token.setUser(user);
             refreshToken = token.getRefreshToken();
         }
@@ -79,8 +77,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User getUserByUsername(String username) {
-        return userDao.findByUsername(username);
+    public UserDto getUserByUsername(String username) {
+        User user = userDao.findByUsername(username);
+        return objectMapper.convertValue(user, UserDto.class);
     }
 
     @Override
@@ -91,7 +90,8 @@ public class UserServiceImpl implements UserService {
         Long refreshTokenValidity = iniConfiguration.getLong(IniConstant.REFRESH_TOKEN_VALIDITY);
         try {
             if (username != null) {
-                userDetails = getUserByUsername(username);
+                UserDto userDto = getUserByUsername(username);
+                userDetails = objectMapper.convertValue(userDto, User.class);
             }
         } catch (FlexitCustomException e) {
             log.error("Error occurred while fetching user");
@@ -104,8 +104,9 @@ public class UserServiceImpl implements UserService {
             || !passwordEncoder.matches(password, userDetails.getPassword())) {
             throw new FlexitCustomException(HttpStatus.BAD_REQUEST, "Username password does not match", "Username and password do not match");
         }
-        accessToken = jwtUtil.generateToken(username, accessTokenValidity);
-        RefreshToken token = setRefreshToken(username, refreshTokenValidity);
+        String role = String.valueOf(userDetails.getRole().getName());
+        accessToken = jwtUtil.generateToken(username, role, accessTokenValidity);
+        RefreshToken token = setRefreshToken(username, role, refreshTokenValidity);
         refreshTokenService.updateInsertRefreshToken(userDetails.getId(), token.getRefreshToken(), token.getExpiryDate());
         return new AuthDtoResponse(accessToken, token.getRefreshToken(), accessTokenValidity, refreshTokenValidity);
     }
@@ -113,7 +114,6 @@ public class UserServiceImpl implements UserService {
     @Override
     public AuthDtoResponse validateUserByToken(String refreshToken) {
         RefreshTokenDto token = null;
-        Optional<User> user;
         Long accessTokenValidity = iniConfiguration.getLong(IniConstant.ACCESS_TOKEN_VALIDITY);
         Long refreshTokenValidity = iniConfiguration.getLong(IniConstant.REFRESH_TOKEN_VALIDITY);
         try {
@@ -127,27 +127,60 @@ public class UserServiceImpl implements UserService {
             throw new FlexitCustomException(HttpStatus.NOT_ACCEPTABLE, "Token not found", "Token not found for the user");
         }
         String username = token.getUser().getUsername();
+        UserDto userDto = getUserByUsername(username);
+        User userDetails = objectMapper.convertValue(userDto, User.class);
+        String role = String.valueOf(userDetails.getRole().getName());
         if (!jwtUtil.validateToken(token.getRefreshToken(), username)) {
             throw new FlexitCustomException(HttpStatus.BAD_REQUEST, "Token is not valid", "Refresh token not valid");
         }
-        if (jwtUtil.isTokenExpired(token.getExpiryDate())) {
+        if (jwtUtil.isRefreshTokenExpired(token.getExpiryDate())) {
             log.error("Refresh token expired");
             throw new FlexitCustomException(HttpStatus.NOT_ACCEPTABLE, "Refresh token expired", "Refresh token expired for the user");
         }
-        String accessToken = jwtUtil.generateToken(username, accessTokenValidity);
+        String accessToken = jwtUtil.generateToken(username, role, accessTokenValidity);
         return new AuthDtoResponse(accessToken, refreshToken, accessTokenValidity, refreshTokenValidity);
+    }
+
+    @Override
+    public void logoutUser(Long userId) {
+        if (userId != null) {
+            refreshTokenService.deleteRefreshTokenByUserid(userId);
+        } else {
+            throw new FlexitCustomException(HttpStatus.BAD_REQUEST, "User Id cannot be null", "Please fill the user id");
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateUser(UserUpdateDto userDto, String username) {
+        Optional<User> existingUserInfo = Optional.ofNullable(userDao.findByUsername(username));
+        if (existingUserInfo.isPresent()) {
+            existingUserInfo.get().setFirstName(userDto.getFirstName());
+            existingUserInfo.get().setLastName(userDto.getLastName());
+            existingUserInfo.get().setEmail(userDto.getEmail());
+            existingUserInfo.get().setAge(userDto.getAge());
+            existingUserInfo.get().setPhoneNumber(userDto.getPhoneNumber());
+            try {
+                userDao.save(existingUserInfo.get());
+            } catch (FlexitCustomException e) {
+                log.error("Exception occurred while updating User {}", e.getDescription());
+                throw new FlexitCustomException(HttpStatus.INTERNAL_SERVER_ERROR, "Exception occurred while updating user", "Exception occurred while updating user");
+            }
+        } else {
+            throw new FlexitCustomException(HttpStatus.BAD_REQUEST, "User not found", "User not found for the username");
+        }
     }
 
     private RoleDto setUserRole(Long roleID) {
         RoleDto role = new RoleDto();
         Optional<Role> roleObj = roleDao.findRoleById(roleID);
         role.setId(roleID);
-        roleObj.ifPresent(value -> role.setName(value.getName()));
+        roleObj.ifPresent(roleValue -> role.setName(roleValue.getName()));
         return role;
     }
 
-    private RefreshToken setRefreshToken(String username, Long refreshTokenValidity) {
-        String refreshToken = jwtUtil.generateToken(username, refreshTokenValidity);
+    private RefreshToken setRefreshToken(String username, String role, Long refreshTokenValidity) {
+        String refreshToken = jwtUtil.generateToken(username, role, refreshTokenValidity);
         RefreshToken token = new RefreshToken();
         token.setRefreshToken(refreshToken);
         token.setExpiryDate(Instant.now().toEpochMilli() + refreshTokenValidity);
